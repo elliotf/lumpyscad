@@ -1,11 +1,18 @@
 resolution = 32;
 
+inch = 25.4; // be able to stick with metric, but have it be meaningful
+
 left   = -1;
 right  = 1;
 front  = -1;
 rear   = 1;
 top    = 1;
 bottom = -1;
+
+// access coordinates in a meaningful way
+x = 0;
+y = 1;
+z = 2;
 
 m5_bolt_diam        = 5.25;
 m5_bolt_head_height = 5;
@@ -101,10 +108,12 @@ module accurate_circle(diam,sides=8) {
   }
 }
 
-module debug_axes(sides=0.2) {
-  color("red") translate([50,0,0]) cube([100,sides,sides],center=true);
-  color("green") translate([0,50,0]) cube([sides,100,sides],center=true);
-  color("blue") translate([0,0,50]) cube([sides,sides,100],center=true);
+module debug_axes(sides=0.1, opacity=0.5) {
+  % union() {
+    color("red", opacity) translate([50,0,0]) cube([100,sides,sides],center=true);
+    color("green", opacity) translate([0,50,0]) cube([sides,100,sides],center=true);
+    color("blue", opacity) translate([0,0,50]) cube([sides,sides,100],center=true);
+  }
 }
 
 module ring(id,thickness,height,fn=16) {
@@ -595,36 +604,71 @@ v_slot_width     = 9.5;
 v_slot_gap       = v_slot_width-v_slot_depth*2;
 v_slot_opening   = 6.2;
 v_slot_cavity_depth = 12.2/2;
+v_slot_center_square = 2*(10-v_slot_cavity_depth-v_slot_depth+v_slot_depth);
 
-module extrusion_2040_profile() {
-  width = 40;
-  height = 20;
-
-  module groove_profile() {
-    square([v_slot_depth*3,v_slot_opening],center=true);
-    hull() {
-      square([v_slot_depth*2,v_slot_gap],center=true);
-      translate([0,0,0]) {
-        square([0.00001,v_slot_width],center=true);
-      }
+module groove_profile() {
+  square([v_slot_depth*3,v_slot_opening],center=true);
+  hull() {
+    square([v_slot_depth*2,v_slot_gap],center=true);
+    translate([0,0,0]) {
+      square([0.00001,v_slot_width],center=true);
     }
+  }
 
-    opening_behind_slot = 1.64;
-    opening_behind_slot_width = v_slot_gap+(v_slot_cavity_depth-opening_behind_slot-v_slot_depth)*2;
+  opening_behind_slot = 1.64;
+  opening_behind_slot_width = v_slot_gap+(v_slot_cavity_depth-opening_behind_slot-v_slot_depth)*2;
 
-    for(side=[left,right]) {
-      translate([side*v_slot_depth,0,0]) {
-        hull() {
-          translate([side*(v_slot_cavity_depth-v_slot_depth)/2,0,0]) {
-            square([v_slot_cavity_depth-v_slot_depth,v_slot_gap],center=true);
-          }
-          translate([side*opening_behind_slot/2,0,0]) {
-            square([opening_behind_slot,opening_behind_slot_width],center=true);
-          }
+  for(side=[left,right]) {
+    translate([side*v_slot_depth,0,0]) {
+      hull() {
+        translate([side*(v_slot_cavity_depth-v_slot_depth)/2,0,0]) {
+          square([v_slot_cavity_depth-v_slot_depth,v_slot_gap],center=true);
+        }
+        translate([side*opening_behind_slot/2,0,0]) {
+          square([opening_behind_slot,opening_behind_slot_width],center=true);
         }
       }
     }
   }
+  /*
+  translate([0,0,0]) {
+    % color("purple", 0.3) {
+      # square([2*(v_slot_cavity_depth-v_slot_depth+v_slot_depth),v_slot_gap],center=true);
+    }
+  }
+  */
+}
+
+module extrusion_2020_profile() {
+  width = 20;
+  height = 20;
+
+  difference() {
+    square([width,height],center=true);
+
+    accurate_circle(4.2,16);
+
+    for(y=[top,bottom]) {
+      translate([0,y*height/2,0]) {
+        rotate([0,0,90]) {
+          groove_profile();
+        }
+      }
+    }
+
+    for(x=[left,right]) {
+      translate([x*width/2,0]) {
+        rotate([0,0,0]) {
+          groove_profile();
+        }
+      }
+    }
+  }
+}
+
+module extrusion_2040_profile() {
+  width = 40;
+  height = 20;
 
   base_unit = 20;
   open_space_between_sides = base_unit-v_slot_depth*2;
@@ -654,6 +698,69 @@ module extrusion_2040_profile() {
       translate([x*width/2,0]) {
         rotate([0,0,0]) {
           groove_profile();
+        }
+      }
+    }
+  }
+}
+
+module extrusion_4040_profile() {
+  width = 40;
+  height = 40;
+
+  base_unit = 20;
+  open_space_between_sides = height-v_slot_depth*2;
+  difference() {
+    square([width,height],center=true);
+
+    square([5.4,open_space_between_sides],center=true);
+    square([open_space_between_sides,5.4],center=true);
+
+    hull() {
+      square([5.4,base_unit-v_slot_depth*2-1.96*2],center=true);
+      square([12.2,5.68],center=true);
+    }
+
+    for(x=[left,right],y=[front,rear]) {
+      translate([x*(base_unit/2),y*(base_unit/2),0]) {
+        accurate_circle(4.2,16);
+
+        translate([-x*(base_unit/2),0,0]) {
+          groove_profile();
+        }
+        translate([0,-y*(base_unit/2),0]) {
+          rotate([0,0,90]) {
+            groove_profile();
+          }
+        }
+      }
+    }
+
+    for(r=[0,90,180,270]) {
+      rotate([0,0,r]) {
+        translate([base_unit/2-v_slot_center_square/2,base_unit/2-v_slot_center_square/2,0]) {
+          round_corner_filler_profile(v_slot_center_square);
+        }
+        rotate([0,0,45]) {
+          translate([-5,0,0]) {
+            square([10,10],center=true);
+          }
+        }
+      }
+    }
+
+    for(x=[left,right]) {
+      for(y=[top,bottom]) {
+        translate([x*base_unit/2,y*height/2,0]) {
+          rotate([0,0,90]) {
+            groove_profile();
+          }
+        }
+
+        translate([x*width/2,y*base_unit/2]) {
+          rotate([0,0,0]) {
+            groove_profile();
+          }
         }
       }
     }
@@ -749,9 +856,27 @@ module corner_bracket_2020() {
   }
 }
 
+module extrusion_2020(len) {
+  color("silver") {
+    linear_extrude(height=len,center=true,convexity=4) {
+      extrusion_2020_profile();
+    }
+  }
+}
+
 module extrusion_2040(len) {
-  linear_extrude(height=len,center=true,convexity=2) {
-    extrusion_2040_profile();
+  color("silver") {
+    linear_extrude(height=len,center=true,convexity=4) {
+      extrusion_2040_profile();
+    }
+  }
+}
+
+module extrusion_4040(len) {
+  color("silver") {
+    linear_extrude(height=len,center=true,convexity=4) {
+      extrusion_4040_profile();
+    }
   }
 }
 
